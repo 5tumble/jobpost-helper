@@ -105,6 +105,22 @@
             Generate personalized cover letters and LinkedIn messages for spontaneous applications
         </p>
 
+        <!-- CV Upload Section -->
+        <div class="cv-section">
+            <h3>📄 CV Upload (Optional)</h3>
+            <div class="form-group">
+                <label for="cvFile">Upload your CV:</label>
+                <input type="file" id="cvFile" accept=".pdf,.docx,.txt" style="margin-bottom: 10px;">
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button type="button" id="uploadCvBtn" onclick="uploadCV()">Upload CV</button>
+                    <button type="button" id="removeCvBtn" onclick="removeCV()" style="display: none;">Remove CV</button>
+                </div>
+            </div>
+            <div id="cvStatus" style="display: none; padding: 10px; background-color: #e8f5e8; border-radius: 5px; margin-top: 10px; margin-bottom: 10px;">
+                <strong>✅ CV Uploaded:</strong> <span id="cvFilename"></span>
+            </div>
+        </div>
+
         <form id="jobForm">
             <div class="form-group">
                 <label for="companyUrl">Company Website URL:</label>
@@ -137,6 +153,96 @@
         const result = document.getElementById('result');
         const resultContent = document.getElementById('resultContent');
         const submitBtn = document.getElementById('submitBtn');
+        const cvFile = document.getElementById('cvFile');
+        const uploadCvBtn = document.getElementById('uploadCvBtn');
+        const removeCvBtn = document.getElementById('removeCvBtn');
+        const cvStatus = document.getElementById('cvStatus');
+        const cvFilename = document.getElementById('cvFilename');
+
+        // CV Upload Functions
+        async function uploadCV() {
+            const file = cvFile.files[0];
+            if (!file) {
+                alert('Please select a CV file first.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                uploadCvBtn.disabled = true;
+                uploadCvBtn.textContent = 'Uploading...';
+
+                const response = await fetch('http://localhost:8000/upload-cv', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    cvStatus.style.display = 'block';
+                    cvFilename.textContent = file.name;
+                    removeCvBtn.style.display = 'inline-block';
+                    alert('CV uploaded and analyzed successfully!');
+                } else {
+                    alert('Error uploading CV: ' + data.detail);
+                }
+            } catch (error) {
+                alert('Error uploading CV: ' + error.message);
+            } finally {
+                uploadCvBtn.disabled = false;
+                uploadCvBtn.textContent = 'Upload CV';
+            }
+        }
+
+        async function removeCV() {
+            try {
+                const response = await fetch('http://localhost:8000/cv', {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    cvStatus.style.display = 'none';
+                    removeCvBtn.style.display = 'none';
+                    cvFile.value = '';
+                    
+                    // Remove visual indicators
+                    cvFile.style.borderColor = '';
+                    cvFile.style.backgroundColor = '';
+                    
+                    alert('CV removed successfully!');
+                } else {
+                    alert('Error removing CV');
+                }
+            } catch (error) {
+                alert('Error removing CV: ' + error.message);
+            }
+        }
+
+        // Check CV status on page load
+        async function checkCVStatus() {
+            try {
+                const response = await fetch('http://localhost:8000/cv-status');
+                const data = await response.json();
+                
+                if (data.has_cv) {
+                    cvStatus.style.display = 'block';
+                    cvFilename.textContent = data.filename;
+                    removeCvBtn.style.display = 'inline-block';
+                    
+                    // Add a visual indicator that CV is loaded
+                    cvFile.style.borderColor = '#28a745';
+                    cvFile.style.backgroundColor = '#f8f9fa';
+                }
+            } catch (error) {
+                console.log('Could not check CV status:', error);
+            }
+        }
+
+        // Check CV status when page loads
+        checkCVStatus();
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -165,13 +271,24 @@
                 });
 
                 const data = await response.json();
+                
+                // Debug logging
+                console.log('Response data:', data);
+                console.log('Processing time:', data.processing_time);
+                console.log('Company analysis:', data.company_analysis);
 
                 if (response.ok) {
                     result.className = 'result success';
                     resultContent.innerHTML = `
                         <h3>✅ Success!</h3>
                         <p><strong>Company:</strong> ${data.company}</p>
+                        <p><strong>Processing time:</strong> ${data.processing_time} seconds</p>
                         <p><strong>Files saved to:</strong> ${data.output_path}</p>
+                        
+                        <div class="output-section">
+                            <h3>🏢 Company Analysis</h3>
+                            <pre>${data.company_analysis || 'No company analysis available'}</pre>
+                        </div>
                         
                         <div class="output-section">
                             <h3>Short Cover Letter</h3>
@@ -184,14 +301,11 @@
                         </div>
                         
                         <div class="output-section">
-                            <h3>Long Cover Letter</h3>
-                            <pre>${data.cover_letters.long}</pre>
-                        </div>
-                        
-                        <div class="output-section">
                             <h3>LinkedIn Message</h3>
                             <pre>${data.linkedin_message}</pre>
                         </div>
+                        
+                        ${data.cv_used ? '<p><strong>✅ CV was used to personalize the cover letters</strong></p>' : ''}
                     `;
                 } else {
                     throw new Error(data.detail || 'Unknown error');
