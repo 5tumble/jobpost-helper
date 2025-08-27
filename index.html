@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JobPost Helper MVP</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        .success {
+            border-left-color: #28a745;
+            background-color: #d4edda;
+        }
+        .loading {
+            text-align: center;
+            color: #666;
+        }
+        .output-section {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .output-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background-color: white;
+            padding: 10px;
+            border-radius: 3px;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 JobPost Helper MVP</h1>
+        <p style="text-align: center; color: #666; margin-bottom: 30px;">
+            Generate personalized cover letters and LinkedIn messages for spontaneous applications
+        </p>
+
+        <form id="jobForm">
+            <div class="form-group">
+                <label for="companyUrl">Company Website URL:</label>
+                <input type="text" id="companyUrl" name="companyUrl" required 
+                       placeholder="https://example.com">
+            </div>
+
+            <div class="form-group">
+                <label for="positionTitle">Position Title (optional):</label>
+                <input type="text" id="positionTitle" name="positionTitle" 
+                       placeholder="Junior Developer, Intern, etc.">
+            </div>
+
+            <div class="form-group">
+                <label for="userNotes">Additional Notes (optional):</label>
+                <textarea id="userNotes" name="userNotes" 
+                          placeholder="Any specific points you want to mention..."></textarea>
+            </div>
+
+            <button type="submit" id="submitBtn">Generate Application</button>
+        </form>
+
+        <div id="result" class="result" style="display: none;">
+            <div id="resultContent"></div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('jobForm');
+        const result = document.getElementById('result');
+        const resultContent = document.getElementById('resultContent');
+        const submitBtn = document.getElementById('submitBtn');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Show loading
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Generating...';
+            result.style.display = 'block';
+            result.className = 'result loading';
+            resultContent.innerHTML = '<p>Analyzing company and generating content...</p>';
+
+            try {
+                const formData = new FormData(form);
+                const requestData = {
+                    company_url: formData.get('companyUrl'),
+                    position_title: formData.get('positionTitle') || null,
+                    user_notes: formData.get('userNotes') || null
+                };
+
+                const response = await fetch('http://localhost:8000/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    result.className = 'result success';
+                    resultContent.innerHTML = `
+                        <h3>✅ Success!</h3>
+                        <p><strong>Company:</strong> ${data.company}</p>
+                        <p><strong>Files saved to:</strong> ${data.output_path}</p>
+                        
+                        <div class="output-section">
+                            <h3>Short Cover Letter</h3>
+                            <pre>${data.cover_letters.short}</pre>
+                        </div>
+                        
+                        <div class="output-section">
+                            <h3>Medium Cover Letter</h3>
+                            <pre>${data.cover_letters.medium}</pre>
+                        </div>
+                        
+                        <div class="output-section">
+                            <h3>Long Cover Letter</h3>
+                            <pre>${data.cover_letters.long}</pre>
+                        </div>
+                        
+                        <div class="output-section">
+                            <h3>LinkedIn Message</h3>
+                            <pre>${data.linkedin_message}</pre>
+                        </div>
+                    `;
+                } else {
+                    throw new Error(data.detail || 'Unknown error');
+                }
+            } catch (error) {
+                result.className = 'result error';
+                resultContent.innerHTML = `
+                    <h3>❌ Error</h3>
+                    <p>${error.message}</p>
+                    <p>Make sure the backend is running on http://localhost:8000</p>
+                `;
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Generate Application';
+            }
+        });
+    </script>
+</body>
+</html>
