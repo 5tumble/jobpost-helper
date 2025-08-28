@@ -5,12 +5,15 @@ An AI-powered tool that automatically generates personalized cover letters and L
 ## 🚀 Features
 
 - **Smart Company Analysis**: Analyzes company websites to understand their business, goals, and technology stack
-- **CV Integration**: Upload your CV once and use it for all applications
+- **Intelligent CV Processing**: Advanced AI-powered CV analysis with structured JSON output
+- **Automatic Name Extraction**: Extracts applicant name from CV automatically - no manual input needed
 - **Personalized Content**: Generates cover letters and LinkedIn messages tailored to each company
 - **Multiple Formats**: Creates short and medium-length cover letters
-- **Local Processing**: Uses Ollama with Mistral-small for privacy and cost-free operation
+- **Self-Validation**: Built-in quality checks ensure consistent, professional output
 - **Smart URL Handling**: Automatically handles URLs with or without https:// or www prefixes
+- **Local Processing**: Uses Ollama with Mistral-small for privacy and cost-free operation
 - **Local Storage**: Saves all generated content to organized text files
+- **Privacy-First**: No personal data stored beyond what's extracted from your CV
 
 ## 🛠️ Technology Stack
 
@@ -57,6 +60,7 @@ An AI-powered tool that automatically generates personalized cover letters and L
 1. **Upload Your CV** (optional but recommended):
    - Click "Choose File" and select your CV (PDF, DOCX, or TXT)
    - Click "Upload CV" to analyze and store it
+   - Your name will be automatically extracted from the CV
 
 2. **Generate Application**:
    - Enter the company website URL (with or without https://)
@@ -110,9 +114,23 @@ Analysis Summary:
 ```
 Dear Hiring Manager,
 
-I'm writing to express my interest in the junior developer position at Example Tech...
+I'm writing to express my interest in the junior developer position at Example Tech. With my background in Python and React development, I believe I can contribute effectively to your team. I would love to have a junior role at your company, but if it's too much to ask, I'm also ready to prove myself with an internship of a duration of your choice.
 
-[Personalized content based on company analysis and CV]
+[Personalized content based on company analysis and CV skills]
+```
+
+**LinkedIn Message**:
+```
+Hey there,
+
+I hope this message finds you well! I'm [Your Name], a student eager to kickstart my career in tech. I came across Example Tech and was really excited about the opportunity to learn and grow as a junior developer/intern.
+
+I've attached my CV for your review. Could you please forward it to the IT team? I'm super enthusiastic about gaining experience and contributing to your projects while learning from the best.
+
+Looking forward to hearing back!
+
+Best,
+[Your Name]
 ```
 
 ## 🔮 Future Features
