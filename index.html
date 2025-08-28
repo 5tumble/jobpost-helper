@@ -31,7 +31,7 @@
             font-weight: bold;
             color: #555;
         }
-        input[type="text"], textarea {
+        input[type="text"], input[type="url"], textarea {
             width: 100%;
             padding: 10px;
             border: 1px solid #ddd;
@@ -96,6 +96,28 @@
             border-radius: 3px;
             border: 1px solid #ddd;
         }
+        .form-group small {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .info-box {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        
+        .info-box ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        .info-box li {
+            margin: 5px 0;
+            color: #495057;
+        }
     </style>
 </head>
 <body>
@@ -121,23 +143,32 @@
             </div>
         </div>
 
-        <form id="jobForm">
+        <form id="applicationForm">
             <div class="form-group">
-                <label for="companyUrl">Company Website URL:</label>
-                <input type="text" id="companyUrl" name="companyUrl" required 
-                       placeholder="https://example.com">
+                <label for="companyUrl">Company Website URL *</label>
+                <input type="url" id="companyUrl" name="companyUrl" required placeholder="https://example.com or www.example.com">
+                <small>Enter the company's main website URL</small>
             </div>
-
+            
             <div class="form-group">
-                <label for="positionTitle">Position Title (optional):</label>
-                <input type="text" id="positionTitle" name="positionTitle" 
-                       placeholder="Junior Developer, Intern, etc.">
+                <label for="positionTitle">Position Title (Optional)</label>
+                <input type="text" id="positionTitle" name="positionTitle" placeholder="e.g., Junior Developer, Software Engineer Intern">
+                <small>Leave empty for general application</small>
             </div>
-
+            
             <div class="form-group">
-                <label for="userNotes">Additional Notes (optional):</label>
-                <textarea id="userNotes" name="userNotes" 
-                          placeholder="Any specific points you want to mention..."></textarea>
+                <label for="userNotes">Additional Notes (Optional)</label>
+                <textarea id="userNotes" name="userNotes" placeholder="Any specific points you want to mention..."></textarea>
+                <small>Optional: Add any specific details about the position or company</small>
+            </div>
+            
+            <div class="info-box">
+                <p><strong>💡 Smart Features:</strong></p>
+                <ul>
+                    <li>Your name will be automatically extracted from your CV</li>
+                    <li>No need to manually enter personal information</li>
+                    <li>Upload your CV once and use it for all applications</li>
+                </ul>
             </div>
 
             <button type="submit" id="submitBtn">Generate Application</button>
@@ -149,7 +180,7 @@
     </div>
 
     <script>
-        const form = document.getElementById('jobForm');
+        const form = document.getElementById('applicationForm');
         const result = document.getElementById('result');
         const resultContent = document.getElementById('resultContent');
         const submitBtn = document.getElementById('submitBtn');
@@ -161,39 +192,45 @@
 
         // CV Upload Functions
         async function uploadCV() {
-            const file = cvFile.files[0];
+            const fileInput = document.getElementById('cvFile');
+            const file = fileInput.files[0];
+            
             if (!file) {
-                alert('Please select a CV file first.');
+                alert('Please select a file first');
                 return;
             }
-
+            
             const formData = new FormData();
             formData.append('file', file);
-
+            
             try {
-                uploadCvBtn.disabled = true;
-                uploadCvBtn.textContent = 'Uploading...';
-
                 const response = await fetch('http://localhost:8000/upload-cv', {
                     method: 'POST',
                     body: formData
                 });
-
+                
                 const data = await response.json();
-
+                
                 if (response.ok) {
+                    // Update CV status
                     cvStatus.style.display = 'block';
-                    cvFilename.textContent = file.name;
+                    cvFilename.textContent = data.filename;
                     removeCvBtn.style.display = 'inline-block';
-                    alert('CV uploaded and analyzed successfully!');
+                    
+                    // Add visual indicator
+                    cvFile.style.borderColor = '#28a745';
+                    cvFile.style.backgroundColor = '#f8f9fa';
+                    
+                    // Check CV status to get extracted name
+                    await checkCVStatus();
+                    
+                    console.log('CV uploaded successfully:', data);
                 } else {
                     alert('Error uploading CV: ' + data.detail);
                 }
             } catch (error) {
-                alert('Error uploading CV: ' + error.message);
-            } finally {
-                uploadCvBtn.disabled = false;
-                uploadCvBtn.textContent = 'Upload CV';
+                console.error('Error:', error);
+                alert('Error uploading CV');
             }
         }
 
@@ -202,22 +239,25 @@
                 const response = await fetch('http://localhost:8000/cv', {
                     method: 'DELETE'
                 });
-
+                
                 if (response.ok) {
+                    // Clear CV status
                     cvStatus.style.display = 'none';
+                    cvFilename.textContent = '';
                     removeCvBtn.style.display = 'none';
-                    cvFile.value = '';
                     
-                    // Remove visual indicators
+                    // Clear file input
+                    cvFile.value = '';
                     cvFile.style.borderColor = '';
                     cvFile.style.backgroundColor = '';
                     
-                    alert('CV removed successfully!');
+                    console.log('CV removed successfully');
                 } else {
                     alert('Error removing CV');
                 }
             } catch (error) {
-                alert('Error removing CV: ' + error.message);
+                console.error('Error:', error);
+                alert('Error removing CV');
             }
         }
 
@@ -230,6 +270,9 @@
                 if (data.has_cv) {
                     cvStatus.style.display = 'block';
                     cvFilename.textContent = data.filename;
+                    if (data.extracted_name && data.extracted_name !== '[Your Name]') {
+                        cvFilename.textContent += ` (Name: ${data.extracted_name})`;
+                    }
                     removeCvBtn.style.display = 'inline-block';
                     
                     // Add a visual indicator that CV is loaded

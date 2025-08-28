@@ -1,115 +1,137 @@
-# JobPost Helper MVP
+# JobPost Helper - AI-Powered Job Application Generator
 
-An AI-powered tool that generates personalized cover letters and LinkedIn messages for spontaneous job applications. Built with Python, FastAPI, and local AI models.
+An AI-powered tool that automatically generates personalized cover letters and LinkedIn messages for job and internship applications. Perfect for overcoming the psychological barrier of job applications by automating the creation of tailored content.
 
 ## 🚀 Features
 
-- **Company Analysis**: Automatically analyzes company websites to understand their business, goals, and focus areas
-- **Personalized Cover Letters**: Generates three versions (short, medium) tailored to each company
-- **LinkedIn Messages**: Creates professional LinkedIn messages for spontaneous applications
-- **Local AI**: Uses Mistral-small via Ollama for privacy and zero API costs
-- **Web Interface**: Simple HTML form for easy interaction
-- **Local Storage**: Saves all generated content to text files
+- **Smart Company Analysis**: Analyzes company websites to understand their business, goals, and technology stack
+- **CV Integration**: Upload your CV once and use it for all applications
+- **Personalized Content**: Generates cover letters and LinkedIn messages tailored to each company
+- **Multiple Formats**: Creates short and medium-length cover letters
+- **Local Processing**: Uses Ollama with Mistral-small for privacy and cost-free operation
+- **Smart URL Handling**: Automatically handles URLs with or without https:// or www prefixes
+- **Local Storage**: Saves all generated content to organized text files
 
-## 🤖 AI Model
+## 🛠️ Technology Stack
 
-This project uses **Mistral-small** via **Ollama** for all AI text generation:
-- **Model**: Mistral-small (local, free)
-- **Memory Usage**: ~9.7GB RAM
-- **Speed**: 5-15 seconds per generation
-- **Privacy**: All processing happens locally on your machine
-- **Cost**: Completely free (no API costs)
+- **Backend**: Python, FastAPI, Uvicorn
+- **AI/LLM**: Ollama with Mistral-small (local, free)
+- **Web Scraping**: Requests, BeautifulSoup
+- **CV Processing**: PyPDF2, python-docx
+- **Frontend**: Simple HTML with JavaScript
+- **Storage**: Local text files
 
 ## 📋 Requirements
 
 - Python 3.8+
-- 32GB+ RAM (for Mistral-small model)
-- Ollama installed
+- 14GB+ RAM (for Mistral-small model)
+- Ollama installed and running
 
-## 🛠 Installation
+## 🚀 Quick Start
 
-1. **Install Ollama**:
+1. **Install Dependencies**:
+   ```bash
+   pip3 install --break-system-packages -r requirements.txt
+   ```
+
+2. **Install Ollama** (if not already installed):
    ```bash
    curl -fsSL https://ollama.ai/install.sh | sh
    ```
 
-2. **Download Mistral-small**:
+3. **Download Mistral-small Model**:
    ```bash
    ollama pull mistral-small
    ```
 
-3. **Install Python dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Start the application**:
+4. **Start the Application**:
    ```bash
    python3 main.py
    ```
 
-5. **Open the web interface**:
-   - Open `index.html` in your browser
-   - Or access `http://localhost:8000` if serving via FastAPI
+5. **Open in Browser**:
+   Navigate to `http://localhost:8000`
+
+## 📖 Usage
+
+1. **Upload Your CV** (optional but recommended):
+   - Click "Choose File" and select your CV (PDF, DOCX, or TXT)
+   - Click "Upload CV" to analyze and store it
+
+2. **Generate Application**:
+   - Enter the company website URL (with or without https://)
+   - Optionally specify the position title
+   - Add any additional notes
+   - Click "Generate Application"
+
+3. **Review Results**:
+   - View the company analysis
+   - Read the generated cover letters (short and medium)
+   - Copy the LinkedIn message
+   - All content is automatically saved to local files
 
 ## 📁 Project Structure
 
 ```
 jobpost_helper/
-├── main.py              # FastAPI backend with AI integration
-├── index.html           # Web interface
+├── main.py              # FastAPI backend
+├── index.html           # Frontend interface
 ├── requirements.txt     # Python dependencies
 ├── start.sh            # Startup script
-├── output/             # Generated cover letters and messages
+├── output/             # Generated applications (auto-created)
 └── README.md           # This file
 ```
 
-## 🎯 Usage
-
-1. **Input Company URL**: Paste the company website you want to apply to
-2. **Optional Fields**: Add position title and notes if desired
-3. **Generate**: Click to analyze company and generate content
-4. **Results**: Get three cover letters and a LinkedIn message
-5. **Files**: All content is saved to the `output/` directory
-
 ## 🔧 API Endpoints
 
+- `GET /` - Main interface
 - `GET /health` - Health check
-- `POST /generate` - Generate cover letters and LinkedIn message
-- `GET /` - Root endpoint
+- `POST /generate` - Generate application content
+- `POST /upload-cv` - Upload and analyze CV
+- `GET /cv-status` - Check CV upload status
+- `DELETE /cv` - Remove stored CV
 
-## 🎨 Example Output
+## 💡 Example Output
 
-Generated files are saved in timestamped directories:
+**Company Analysis**:
 ```
-output/
-└── 20241227_143022_Company_Name/
-    ├── company_info.txt
-    ├── cover_letter_short.txt
-    ├── cover_letter_medium.txt
-    └── linkedin_message.txt
+Company Name: Example Tech
+Website: https://example.com
+Description: Custom software development company
+
+Analysis Summary:
+- Company appears to be: Example Tech
+- Main business focus: Custom software development
+- Technologies used: React, Node.js, Python
+- Notable clients: DHL, SNCB
 ```
 
-## 🚧 Future Features
+**Cover Letter** (Medium):
+```
+Dear Hiring Manager,
 
-- [ ] CV upload and analysis (.pdf, .docx, .txt)
-- [ ] Queue system with status indicators
-- [ ] Multiple AI model support
-- [ ] Export to different formats
-- [ ] Application history tracking
+I'm writing to express my interest in the junior developer position at Example Tech...
+
+[Personalized content based on company analysis and CV]
+```
+
+## 🔮 Future Features
+
+- Queue system for multiple applications
+- Progress indicators and status tracking
+- Copy-to-clipboard functionality
+- Export to different formats
+- Template customization
+- Advanced company research
 
 ## 🤝 Contributing
 
-This is a personal project for learning LLM integration and automating job applications. Feel free to fork and adapt for your own needs!
+This is a personal project designed to help with job applications. Feel free to fork and adapt for your own needs!
 
 ## 📄 License
 
-Personal use - feel free to use and modify for your own job applications.
+Personal use - feel free to modify and use for your own job applications.
 
-## 💡 Motivation
+## 💭 Motivation
 
-Built to reduce the psychological barrier of job applications by automating the repetitive parts while maintaining personalization and quality.
-
----
-
-**Built with ❤️ for job seekers who want to focus on what matters most.**
+Job applications can be psychologically challenging. This tool aims to reduce that burden by automating the repetitive parts while maintaining personalization and authenticity.

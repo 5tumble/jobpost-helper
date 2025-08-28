@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing import Optional
 import requests
 from bs4 import BeautifulSoup
@@ -45,6 +45,11 @@ class JobRequest(BaseModel):
     company_url: str
     position_title: Optional[str] = None
     user_notes: Optional[str] = None
+    
+    @validator('company_url')
+    def validate_company_url(cls, v):
+        # Accept any string for URL - we'll handle normalization later
+        return v
 
 def extract_text_from_pdf(file_content: bytes) -> str:
     """Extract text from PDF file"""
@@ -76,24 +81,64 @@ def analyze_cv(cv_text: str) -> dict:
         logger.debug("Analyzing CV content...")
         
         prompt = f"""
-Analyze this CV and extract key information for job applications:
+You are a professional CV analyst. Extract structured information from CVs for job applications.
 
 CV Content:
 {cv_text}
 
-Please extract and structure the following information:
-1. Name
-2. Email
-3. Phone (if available)
-4. Location
-5. Education (degrees, institutions, years)
-6. Work Experience (companies, positions, durations, key responsibilities)
-7. Technical Skills (programming languages, frameworks, tools)
-8. Projects (if any)
-9. Languages (if any)
-10. Key achievements or highlights
+Follow this exact JSON format for your response:
 
-Format the response as a structured summary that can be used for cover letter generation.
+{{
+  "name": "Full Name",
+  "email": "email@example.com",
+  "phone": "phone number or null",
+  "location": "City, Country",
+  "education": [
+    {{
+      "degree": "Degree Name",
+      "institution": "University Name",
+      "year": "2020-2024"
+    }}
+  ],
+  "work_experience": [
+    {{
+      "company": "Company Name",
+      "position": "Job Title",
+      "duration": "2022-2023",
+      "responsibilities": ["Responsibility 1", "Responsibility 2"]
+    }}
+  ],
+  "technical_skills": ["Python", "JavaScript", "React"],
+  "projects": [
+    {{
+      "name": "Project Name",
+      "description": "Brief description",
+      "technologies": ["Tech1", "Tech2"],
+      "impact": "What was achieved"
+    }}
+  ],
+  "languages": ["English", "French"],
+  "achievements": ["Achievement 1", "Achievement 2"],
+  "certifications": ["Cert 1", "Cert 2"],
+  "soft_skills": ["Communication", "Teamwork", "Problem-solving"]
+}}
+
+IMPORTANT RULES:
+1. Output ONLY valid JSON - no other text
+2. If information is not available, use null or empty arrays
+3. Focus on skills relevant for junior developer positions
+4. Be specific about technologies and tools mentioned
+5. Extract the most recent and relevant information
+
+Example of good extraction:
+Input: "John Smith, john@email.com, Python developer with React experience"
+Output: {{
+  "name": "John Smith",
+  "email": "john@email.com",
+  "technical_skills": ["Python", "React"]
+}}
+
+Now analyze the CV above and provide ONLY the JSON response.
 """
 
         response = ollama.chat(
@@ -101,19 +146,70 @@ Format the response as a structured summary that can be used for cover letter ge
             messages=[{"role": "user", "content": prompt}]
         )
         
-        logger.debug("CV analysis completed")
-        return {
-            "raw_text": cv_text,
-            "analysis": response['message']['content']
-        }
+        content = response['message']['content']
+        
+        # Try to parse JSON response
+        try:
+            import json
+            cv_data = json.loads(content)
+            extracted_name = cv_data.get('name', '[Your Name]')
+            
+            # Convert back to structured text for backward compatibility
+            analysis_text = f"""
+Name: {cv_data.get('name', 'Not found')}
+Email: {cv_data.get('email', 'Not found')}
+Phone: {cv_data.get('phone', 'Not found')}
+Location: {cv_data.get('location', 'Not found')}
+
+Education:
+{chr(10).join([f"- {edu.get('degree', '')} at {edu.get('institution', '')} ({edu.get('year', '')})" for edu in cv_data.get('education', [])])}
+
+Work Experience:
+{chr(10).join([f"- {exp.get('position', '')} at {exp.get('company', '')} ({exp.get('duration', '')})" for exp in cv_data.get('work_experience', [])])}
+
+Technical Skills: {', '.join(cv_data.get('technical_skills', []))}
+
+Projects:
+{chr(10).join([f"- {proj.get('name', '')}: {proj.get('description', '')} (Tech: {', '.join(proj.get('technologies', []))})" for proj in cv_data.get('projects', [])])}
+
+Languages: {', '.join(cv_data.get('languages', []))}
+Soft Skills: {', '.join(cv_data.get('soft_skills', []))}
+"""
+            
+            logger.debug(f"CV analysis completed. Extracted name: {extracted_name}")
+            return {
+                "raw_text": cv_text,
+                "analysis": analysis_text,
+                "extracted_name": extracted_name,
+                "structured_data": cv_data  # Keep the JSON data for future use
+            }
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON response: {e}")
+            logger.error(f"Raw response: {content}")
+            
+            # Fallback to old parsing method
+            extracted_name = "[Your Name]"
+            if content.startswith("NAME:"):
+                name_line = content.split('\n')[0]
+                extracted_name = name_line.replace("NAME:", "").strip()
+                content = '\n'.join(content.split('\n')[1:])
+            
+            return {
+                "raw_text": cv_text,
+                "analysis": content,
+                "extracted_name": extracted_name,
+                "structured_data": None
+            }
         
     except Exception as e:
         logger.error(f"Error analyzing CV: {e}")
-        return {"raw_text": cv_text, "analysis": "Error analyzing CV"}
+        return {"raw_text": cv_text, "analysis": "Error analyzing CV", "extracted_name": "[Your Name]", "structured_data": None}
 
 def analyze_company(url: str) -> dict:
     """Simple company analysis"""
     try:
+        logger.debug(f"Analyzing company URL: {url}")
         response = requests.get(url, timeout=10)
         soup = BeautifulSoup(response.content, 'html.parser')
         
@@ -254,7 +350,7 @@ Additional Information Found:"""
         else:
             return {"error": f"Could not analyze company: {error_msg}"}
 
-def generate_cover_letter(company_info: dict, cv_info: dict = None, position: str = "junior developer", notes: str = "") -> dict:
+def generate_cover_letter(company_info: dict, cv_info: dict = None, position: str = "junior developer", notes: str = "", applicant_name: str = "[Your Name]") -> dict:
     """Generate cover letter using Mistral-small"""
     logger.debug(f"Starting cover letter generation for company: {company_info.get('company_name')}")
     try:
@@ -266,30 +362,50 @@ CV Information:
 """
         
         prompt = f"""
-Generate a casual professional cover letter for a junior developer position.
+You are a professional cover letter writer. Generate personalized cover letters for junior developer positions.
 
 Company: {company_info.get('company_name', 'Unknown')}
 Company Description: {company_info.get('description', 'No description available')}
 Position: {position}
+Applicant Name: {applicant_name}
 User Notes: {notes}
 {cv_context}
 
 IMPORTANT: If the company name or description contains error messages like "403 Forbidden", "404 Not Found", "Error", or similar technical terms, treat this as missing information and focus on the position and your skills instead.
 
-Requirements:
-- Casual professional tone
-- Direct and practical
-- Show genuine interest in their technical work
-- Include this phrase: "I would love to have a junior role at your company, but if it's too much to ask, I'm also ready to prove myself with an internship of a duration of your choice"
-- Keep it honest and straightforward
-- Avoid overly flowery language
-- If CV information is provided, reference specific skills and experience that match the company's needs
-- If there are skill gaps, mention them as learning opportunities
-- If company information is limited or contains errors, focus on your enthusiasm for the position and willingness to learn
+TONE REQUIREMENTS:
+- Professional but approachable
+- Clear and concise language
+- Simple vocabulary, short sentences
+- Enthusiastic about learning and growing
+- Honest about junior level experience
+- Direct and practical communication
 
+CONTENT REQUIREMENTS:
+- Include this exact phrase: "I would love to have a junior role at your company, but if it's too much to ask, I'm also ready to prove myself with an internship of a duration of your choice"
+- Reference specific skills from the CV that match the company's needs
+- Mention specific projects if they relate to the company's work
+- Address skill gaps as learning opportunities
+- Show genuine interest in their technical work
+- Use {applicant_name} as the applicant's name
+- Use [Your Email] as a placeholder for the applicant's email
+
+OUTPUT FORMAT:
 Generate two versions:
-1. Short (1 paragraph)
-2. Medium (1/4 page)
+1. Short (1 paragraph, ~100 words)
+2. Medium (1/4 page, ~250 words)
+
+SELF-VALIDATION CHECKLIST:
+Before providing your final answer, verify:
+1. Did you include the required phrase about junior role/internship?
+2. Did you reference specific CV skills that match the company?
+3. Did you avoid inventing company details not provided?
+4. Did you maintain the specified tone (professional but approachable)?
+5. Did you use the correct applicant name?
+6. Are the lengths appropriate (short: ~100 words, medium: ~250 words)?
+7. Did you avoid generic statements that could apply to any company?
+
+If any of these checks fail, revise your response before providing the final answer.
 """
 
         logger.debug("Making Ollama API call...")
@@ -321,27 +437,48 @@ Generate two versions:
         logger.error(f"Error type: {type(e)}")
         return {"error": f"Could not generate cover letter: {str(e)}"}
 
-def generate_linkedin_message(company_info: dict) -> str:
+def generate_linkedin_message(company_info: dict, applicant_name: str = "[Your Name]") -> str:
     """Generate LinkedIn message"""
     logger.debug(f"Starting LinkedIn message generation for company: {company_info.get('company_name')}")
     try:
         prompt = f"""
-Generate a casual LinkedIn message for spontaneous application as a junior developer/intern.
+You are a professional LinkedIn message writer. Generate casual outreach messages for junior developer applications.
 
 Company: {company_info.get('company_name', 'Unknown')}
 Company Description: {company_info.get('description', 'No description available')}
+Applicant Name: {applicant_name}
 
-Requirements:
-- Casual and friendly tone
+TONE REQUIREMENTS:
+- Casual and friendly (like a student reaching out)
+- Professional but not formal
+- Clear and concise language
+- Enthusiastic about learning and growing
+- Position as junior developer/intern seeking experience
+
+CONTENT REQUIREMENTS:
 - Under 150 words
 - Mention you'll attach your CV
 - Ask to forward profile to IT team
 - Show enthusiasm for learning and growing
-- Position yourself as a junior developer/intern looking to learn
-- Express interest in gaining experience
-- Avoid sounding like an experienced professional
-- Focus on willingness to learn and contribute
-- Direct and practical tone
+- Use phrases like "junior developer", "intern", "student", "learning", "growing"
+- Avoid phrases like "IT professional", "experienced", "expert"
+- Use {applicant_name} as the applicant's name
+- Sound like someone excited to start their career
+
+OUTPUT FORMAT:
+Generate a single, concise LinkedIn message.
+
+SELF-VALIDATION CHECKLIST:
+Before providing your final answer, verify:
+1. Is the message under 150 words?
+2. Did you mention attaching your CV?
+3. Did you ask to forward to IT team?
+4. Did you avoid sounding like an experienced professional?
+5. Did you use the correct applicant name?
+6. Is the tone casual and friendly?
+7. Did you show enthusiasm for learning?
+
+If any of these checks fail, revise your response before providing the final answer.
 """
 
         logger.debug("Making Ollama API call for LinkedIn message...")
@@ -449,7 +586,8 @@ async def get_cv_status():
     return {
         "has_cv": cv_data is not None,
         "filename": cv_file_path,
-        "cv_analysis": cv_data.get('analysis', '') if cv_data else None
+        "cv_analysis": cv_data.get('analysis', '') if cv_data else None,
+        "extracted_name": cv_data.get('extracted_name', '') if cv_data else None
     }
 
 @app.delete("/cv")
@@ -466,26 +604,45 @@ async def generate_application(request: JobRequest):
     import time
     start_time = time.time()
     
-    logger.debug(f"Received request for URL: {request.company_url}")
+    # Normalize URL - add https:// if missing
+    company_url = request.company_url
+    if not company_url.startswith(('http://', 'https://')):
+        if company_url.startswith('www.'):
+            company_url = 'https://' + company_url
+        else:
+            company_url = 'https://' + company_url
+    
+    logger.debug(f"Original URL: {request.company_url}")
+    logger.debug(f"Normalized URL: {company_url}")
+    logger.debug(f"Received request for URL: {company_url}")
     try:
         # Analyze company
-        company_info = analyze_company(request.company_url)
+        company_info = analyze_company(company_url)
         if "error" in company_info:
             raise HTTPException(status_code=400, detail=company_info["error"])
         
         # Generate cover letters with CV info if available
+        # Use CV name if available, otherwise use default
+        applicant_name = "[Your Name]"
+        if cv_data and cv_data.get('extracted_name') and cv_data.get('extracted_name') != "[Your Name]":
+            applicant_name = cv_data.get('extracted_name')
+            logger.debug(f"Using name from CV: {applicant_name}")
+        else:
+            logger.debug(f"No CV name available, using default: {applicant_name}")
+        
         cover_letters = generate_cover_letter(
             company_info, 
             cv_data,  # Pass CV data if available
             request.position_title or "junior developer",
-            request.user_notes or ""
+            request.user_notes or "",
+            applicant_name # Pass the determined applicant name
         )
         
         if "error" in cover_letters:
             raise HTTPException(status_code=500, detail=cover_letters["error"])
         
         # Generate LinkedIn message
-        linkedin_message = generate_linkedin_message(company_info)
+        linkedin_message = generate_linkedin_message(company_info, applicant_name)
         
         # Save to files
         output_path = save_application(
